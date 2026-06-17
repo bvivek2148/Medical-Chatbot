@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medi-Chat — Professional AI Medical Assistant</title>
+    <meta name="description" content="Get instant, reliable information on medical questions with our advanced AI Medical Chatbot. Deep-learning powered and medical context-aware.">
+    <meta name="keywords" content="medical chatbot, ai medical assistant, healthcare ai, medical q&a">
+    <meta property="og:title" content="Medi-Chat — Professional AI Medical Assistant">
+    <meta property="og:description" content="Interactive AI assistant designed to answer health-related and medical questions based on specialized medical references.">
+    <meta property="og:type" content="website">
+    
+    <!-- Google Fonts & Styles -->
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}"/>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <a href="/" class="brand">
+            <div class="brand-logo">
+                <i data-lucide="stethoscope" style="width: 1.5rem; height: 1.5rem;"></i>
+            </div>
+            <div class="brand-name">MEDI-CHAT</div>
+            <span class="brand-badge">v2.0 Beta</span>
+        </a>
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span>AI Assistant Online</span>
+        </div>
+    </header>
+
+    <!-- Chat Container -->
+    <main class="chat-container">
+        <div class="chat-card">
+            <!-- Chat Body -->
+            <div class="chat-body" id="messageFormeight">
+                <!-- Welcome Screen -->
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="welcome-icon">
+                        <i data-lucide="heart-pulse" style="width: 3.5rem; height: 3.5rem;"></i>
+                    </div>
+                    <h1 class="welcome-title">How can I help you today?</h1>
+                    <p class="welcome-subtitle">Ask questions about medical terms, symptoms, or health recommendations. I can help guide your general research.</p>
+                    
+                    <span class="suggestions-title">Suggested Topics</span>
+                    <div class="suggestions-grid">
+                        <button class="suggestion-chip" data-question="What are symptoms of flu?">
+                            <i data-lucide="message-square-plus" style="width: 1rem; height: 1rem;"></i>
+                            <span>What are symptoms of flu?</span>
+                        </button>
+                        <button class="suggestion-chip" data-question="How to treat a burn?">
+                            <i data-lucide="message-square-plus" style="width: 1rem; height: 1rem;"></i>
+                            <span>How to treat a minor burn?</span>
+                        </button>
+                        <button class="suggestion-chip" data-question="Explain high blood pressure">
+                            <i data-lucide="message-square-plus" style="width: 1rem; height: 1rem;"></i>
+                            <span>Explain high blood pressure</span>
+                        </button>
+                        <button class="suggestion-chip" data-question="What causes a migraine?">
+                            <i data-lucide="message-square-plus" style="width: 1rem; height: 1rem;"></i>
+                            <span>What causes a migraine?</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages will be appended here dynamically -->
+            </div>
+
+            <!-- Chat Footer / Input area -->
+            <footer class="chat-footer">
+                <!-- Image Preview Area -->
+                <div id="imagePreviewContainer" class="image-preview-container" style="display: none;">
+                    <div class="preview-wrapper">
+                        <img id="imagePreview" src="" alt="Upload Preview">
+                        <button type="button" id="removeImageBtn" class="preview-remove" aria-label="Remove image">
+                            <i data-lucide="x" style="width: 0.75rem; height: 0.75rem;"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <form id="messageArea">
+                    <div class="input-container">
+                        <!-- Hidden File Input -->
+                        <input type="file" id="imageInput" accept="image/*" style="display: none;"/>
+                        
+                        <!-- Attachment Button -->
+                        <button type="button" id="attachBtn" class="attach-button" aria-label="Attach medical image">
+                            <i data-lucide="image" style="width: 1.1rem; height: 1.1rem;"></i>
+                        </button>
+
+                        <input type="text" 
+                               id="text" 
+                               name="msg" 
+                               class="chat-input" 
+                               placeholder="Type your medical question..." 
+                               autocomplete="off" 
+                               aria-label="Message input"/>
+                        <div class="input-actions">
+                            <span class="char-counter" id="char-counter">0 / 500</span>
+                            <button type="submit" id="send" class="send-button" aria-label="Send message" disabled>
+                                <i data-lucide="send" style="width: 1.1rem; height: 1.1rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div class="input-hint">
+                    <span>Press Enter to send</span>
+                    <span class="medical-disclaimer">
+                        <i data-lucide="alert-circle" style="width: 0.85rem; height: 0.85rem; display: inline-block; vertical-align: middle;"></i>
+                        Not a substitute for professional medical advice
+                    </span>
+                </div>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Vanilla Javascript Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const messageForm = document.getElementById('messageArea');
+            const messageInput = document.getElementById('text');
+            const messageContainer = document.getElementById('messageFormeight');
+            const sendButton = document.getElementById('send');
+            const charCounter = document.getElementById('char-counter');
+            const welcomeScreen = document.getElementById('welcome-screen');
+            const suggestionChips = document.querySelectorAll('.suggestion-chip');
+            const imageInput = document.getElementById('imageInput');
+            const attachBtn = document.getElementById('attachBtn');
+            const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+            const imagePreview = document.getElementById('imagePreview');
+            const removeImageBtn = document.getElementById('removeImageBtn');
+
+            // Initialize Lucide Icons
+            lucide.createIcons();
+
+            // Max character limit
+            const MAX_CHARS = 500;
+            let selectedImageFile = null;
+
+            // Update send button status
+            function updateSendButtonState() {
+                const hasText = messageInput.value.trim().length > 0;
+                const hasImage = !!selectedImageFile;
+                sendButton.disabled = !(hasText || hasImage);
+            }
+
+            // Handle attachment button click
+            attachBtn.addEventListener('click', () => {
+                imageInput.click();
+            });
+
+            // Handle file input change
+            imageInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (!file.type.startsWith('image/')) {
+                        alert('Please select an image file.');
+                        imageInput.value = '';
+                        return;
+                    }
+                    
+                    selectedImageFile = file;
+                    
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        imagePreview.src = event.target.result;
+                        imagePreviewContainer.style.display = 'flex';
+                        attachBtn.classList.add('active');
+                        updateSendButtonState();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Handle remove image click
+            removeImageBtn.addEventListener('click', () => {
+                clearImageAttachment();
+            });
+
+            function clearImageAttachment() {
+                selectedImageFile = null;
+                imageInput.value = '';
+                imagePreview.src = '';
+                imagePreviewContainer.style.display = 'none';
+                attachBtn.classList.remove('active');
+                updateSendButtonState();
+            }
+
+            // Handle input typing
+            messageInput.addEventListener('input', () => {
+                const len = messageInput.value.length;
+                charCounter.textContent = `${len} / ${MAX_CHARS}`;
+                
+                if (len > MAX_CHARS) {
+                    messageInput.value = messageInput.value.substring(0, MAX_CHARS);
+                    charCounter.textContent = `${MAX_CHARS} / ${MAX_CHARS}`;
+                }
+                
+                updateSendButtonState();
+            });
+
+            // Handle suggested chips click
+            suggestionChips.forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const question = chip.getAttribute('data-question');
+                    sendMessage(question);
+                });
+            });
+
+            // Form submission
+            messageForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const text = messageInput.value.trim();
+                if (text || selectedImageFile) {
+                    sendMessage(text);
+                }
+            });
+
+            // Submit on Enter
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    messageForm.dispatchEvent(new Event('submit'));
+                }
+            });
+
+            async function sendMessage(text) {
+                if (!text && !selectedImageFile) return;
+
+                // Hide welcome screen on first message
+                if (welcomeScreen && welcomeScreen.style.display !== 'none') {
+                    welcomeScreen.style.display = 'none';
+                }
+
+                const time = getFormattedTime();
+                
+                // Add user message to UI (with preview if present)
+                let imageSrc = null;
+                if (selectedImageFile) {
+                    imageSrc = imagePreview.src;
+                }
+                appendUserMessage(text, imageSrc, time);
+
+                // Prepare multipart Form Data
+                const formData = new FormData();
+                formData.append('msg', text || '');
+                if (selectedImageFile) {
+                    formData.append('image', selectedImageFile);
+                }
+
+                // Reset inputs and disable send
+                messageInput.value = '';
+                charCounter.textContent = `0 / ${MAX_CHARS}`;
+                clearImageAttachment();
+                
+                // Show typing indicator
+                showTypingIndicator();
+
+                try {
+                    const response = await fetch('/get', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+
+                    const data = await response.json();
+                    removeTypingIndicator();
+
+                    if (data.status === 'success') {
+                        appendBotMessage(data.answer, time);
+                    } else {
+                        appendErrorMessage(data.message || 'An error occurred on the server.', time);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    removeTypingIndicator();
+                    appendErrorMessage('Could not connect to server. Please check your connection.', time);
+                } finally {
+                    messageInput.focus();
+                }
+            }
+
+            function getFormattedTime() {
+                return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function escapeHtml(unsafe) {
+                return unsafe
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function appendUserMessage(text, imageSrc, time) {
+                let imageHtml = '';
+                if (imageSrc) {
+                    imageHtml = `<img src="${imageSrc}" class="chat-image" alt="Uploaded medical image" onclick="window.open(this.src, '_blank')">`;
+                }
+                const textHtml = text ? `<div class="message-bubble">${escapeHtml(text)}</div>` : '';
+                
+                const userHtml = `
+                    <div class="message-row user">
+                        <div class="message-content">
+                            ${imageHtml}
+                            ${textHtml}
+                            <span class="message-meta">${time}</span>
+                        </div>
+                    </div>
+                `;
+                messageContainer.insertAdjacentHTML('beforeend', userHtml);
+                scrollToBottom();
+            }
+
+            function appendBotMessage(text, time) {
+                const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+                let lastIndex = 0;
+                let match;
+                let finalHtml = '';
+                
+                while ((match = imgRegex.exec(text)) !== null) {
+                    finalHtml += escapeHtml(text.substring(lastIndex, match.index)).replace(/\n/g, '<br>');
+                    const safeUrl = match[2].replace(/"/g, '&quot;');
+                    const safeAlt = escapeHtml(match[1]);
+                    finalHtml += `<img src="${safeUrl}" alt="${safeAlt}" class="chat-image" style="margin-top: 0.5rem;" onclick="window.open(this.src, '_blank')">`;
+                    lastIndex = imgRegex.lastIndex;
+                }
+                finalHtml += escapeHtml(text.substring(lastIndex)).replace(/\n/g, '<br>');
+
+                const botHtml = `
+                    <div class="message-row bot">
+                        <div class="bot-wrapper">
+                            <div class="bot-avatar-inline">
+                                <i data-lucide="activity" style="width: 1.1rem; height: 1.1rem;"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-bubble">
+                                    ${finalHtml}
+                                </div>
+                                <span class="message-meta">Medi-Chat • ${time}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                messageContainer.insertAdjacentHTML('beforeend', botHtml);
+                lucide.createIcons(); // Initialize the icon in new message
+                scrollToBottom();
+            }
+
+            function appendErrorMessage(text, time) {
+                const errorHtml = `
+                    <div class="message-row bot">
+                        <div class="bot-wrapper">
+                            <div class="bot-avatar-inline" style="background: rgba(244, 63, 94, 0.1); border-color: rgba(244, 63, 94, 0.2); color: var(--error);">
+                                <i data-lucide="alert-triangle" style="width: 1.1rem; height: 1.1rem;"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-bubble error-bubble">
+                                    ${escapeHtml(text)}
+                                </div>
+                                <span class="message-meta">System • ${time}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                messageContainer.insertAdjacentHTML('beforeend', errorHtml);
+                lucide.createIcons();
+                scrollToBottom();
+            }
+
+            let typingIndicator = null;
+
+            function showTypingIndicator() {
+                const typingHtml = `
+                    <div class="message-row bot" id="typing-indicator">
+                        <div class="bot-wrapper">
+                            <div class="bot-avatar-inline">
+                                <i data-lucide="activity" style="width: 1.1rem; height: 1.1rem;"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-bubble typing-bubble">
+                                    <span class="typing-dot"></span>
+                                    <span class="typing-dot"></span>
+                                    <span class="typing-dot"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                messageContainer.insertAdjacentHTML('beforeend', typingHtml);
+                lucide.createIcons();
+                typingIndicator = document.getElementById('typing-indicator');
+                scrollToBottom();
+            }
+
+            function removeTypingIndicator() {
+                if (typingIndicator) {
+                    typingIndicator.remove();
+                    typingIndicator = null;
+                }
+            }
+
+            function scrollToBottom() {
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
